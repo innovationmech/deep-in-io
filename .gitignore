@@ -1,0 +1,60 @@
+# Compiled binaries
+basic_epoll_server
+epoll_mt_server
+
+# Object files
+*.o
+*.obj
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Static and dynamic libraries
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Core dumps
+core
+core.*
+vgcore.*
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build directories
+build/
+dist/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Docker
+.dockerignore
