@@ -42,13 +42,6 @@ run-basic: basic_epoll_server
 run-mt: epoll_mt_server
 	./epoll_mt_server
 
-# Install (optional)
-install: $(TARGETS)
-	cp $(TARGETS) /usr/local/bin/
-
-# Uninstall (optional)
-uninstall:
-	rm -f /usr/local/bin/basic_epoll_server /usr/local/bin/epoll_mt_server
 
 # Help information
 help:
@@ -61,8 +54,6 @@ ifeq ($(UNAME_S),Linux)
 	@echo "  rebuild      - Clean and build all"
 	@echo "  run-basic    - Build and run basic server"
 	@echo "  run-mt       - Build and run multithreaded server"
-	@echo "  install      - Install binaries to /usr/local/bin"
-	@echo "  uninstall    - Remove installed binaries"
 else
 	@echo "  Platform: $(UNAME_S) (not supported)"
 	@echo "  Note: epoll is Linux-specific. To compile and run these programs:"
@@ -78,18 +69,6 @@ else
 endif
 	@echo "  help         - Show this help message"
 
-# Docker support (for non-Linux platforms)
-docker-build:
-	@echo "Building Docker image for epoll servers..."
-	docker build -t epoll-servers .
-
-docker-run-basic:
-	@echo "Running basic epoll server in Docker..."
-	docker run -p 8888:8888 epoll-servers ./basic_epoll_server
-
-docker-run-mt:
-	@echo "Running multithreaded epoll server in Docker..."
-	docker run -p 8888:8888 epoll-servers ./epoll_mt_server
 
 # Declare phony targets
-.PHONY: all clean rebuild run-basic run-mt install uninstall help docker-build docker-run-basic docker-run-mt
+.PHONY: all clean rebuild run-basic run-mt help
