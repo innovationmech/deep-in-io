@@ -16,9 +16,13 @@ static void handle_read(io_thread_t *io_thread, connection_t *conn) {
             pthread_mutex_unlock(&io_thread->stats_mutex);
             
             // 创建处理任务并提交到工作线程池
+            log_info("Read %d bytes from fd=%d", n, conn->fd);
             task_t *task = task_create(TASK_TYPE_PROCESS, conn, buffer, n);
             if (task) {
+                log_info("Submitting task for fd=%d to worker pool", conn->fd);
                 thread_pool_submit(io_thread->worker_pool, task);
+            } else {
+                log_error("Failed to create task for fd=%d", conn->fd);
             }
             
             conn->last_active = time(NULL);
@@ -136,6 +140,7 @@ static void* io_thread_run(void *arg) {
             }
             
             if (ev->events & EPOLLOUT) {
+                log_info("EPOLLOUT event for fd=%d", conn->fd);
                 handle_write(io_thread, conn);
             }
             

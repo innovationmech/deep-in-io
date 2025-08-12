@@ -25,9 +25,6 @@ static void process_request(connection_t *conn, void *data, int data_len) {
                            (int)strlen(body), body);
     
     // 将响应数据写入连接的写缓冲区
-    pthread_mutex_t *conn_mutex = (pthread_mutex_t*)((char*)conn + sizeof(connection_t));
-    pthread_mutex_lock(conn_mutex);
-    
     if (response_len < BUFFER_SIZE) {
         memcpy(conn->write_buf, response, response_len);
         conn->write_size = response_len;
@@ -35,13 +32,15 @@ static void process_request(connection_t *conn, void *data, int data_len) {
         conn->state = CONN_STATE_WRITING;
     }
     
-    pthread_mutex_unlock(conn_mutex);
-    
     // 通知 IO 线程可以写入数据
     struct epoll_event ev;
     ev.events = EPOLLOUT | EPOLLET;
     ev.data.ptr = conn;
-    epoll_ctl(conn->epoll_fd, EPOLL_CTL_MOD, conn->fd, &ev);
+    if (epoll_ctl(conn->epoll_fd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
+        log_error("Failed to modify epoll event for fd=%d: %s", conn->fd, strerror(errno));
+    } else {
+        log_info("Response prepared for fd=%d, switching to EPOLLOUT", conn->fd);
+    }
 }
 
 // 工作线程函数
@@ -59,6 +58,7 @@ static void* worker_thread(void *arg) {
         switch (task->type) {
             case TASK_TYPE_PROCESS:
                 // 处理业务逻辑
+                log_info("Processing request for fd=%d, data_len=%d", task->conn->fd, task->data_len);
                 process_request(task->conn, task->data, task->data_len);
                 break;
                 

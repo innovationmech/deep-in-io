@@ -22,6 +22,7 @@ all: $(TARGET)
 # 链接
 $(TARGET): $(OBJS)
 	$(CC) $(OBJS) -o $(TARGET) $(LDFLAGS)
+	@rm -f $(OBJS)
 
 # 编译
 %.o: %.c

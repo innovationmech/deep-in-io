@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <errno.h>
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 8080
@@ -23,7 +24,12 @@ typedef struct {
 void* client_thread(void* arg) {
     thread_data_t* data = (thread_data_t*)arg;
     
+    printf("Thread %d starting...\n", data->thread_id);
+    
     for (int i = 0; i < REQUESTS_PER_THREAD; i++) {
+        if (i % 10 == 0) {
+            printf("Thread %d: request %d/%d\n", data->thread_id, i, REQUESTS_PER_THREAD);
+        }
         struct timespec start, end;
         clock_gettime(CLOCK_MONOTONIC, &start);
         
@@ -42,6 +48,7 @@ void* client_thread(void* arg) {
         inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr);
         
         if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+            printf("Thread %d: connect failed for request %d\n", data->thread_id, i);
             data->failed_requests++;
             close(sock);
             continue;
@@ -54,10 +61,17 @@ void* client_thread(void* arg) {
                              "\r\n";
         
         if (send(sock, request, strlen(request), 0) < 0) {
+            printf("Thread %d: send failed for request %d\n", data->thread_id, i);
             data->failed_requests++;
             close(sock);
             continue;
         }
+        
+        // 设置接收超时 (5秒)
+        struct timeval timeout;
+        timeout.tv_sec = 5;
+        timeout.tv_usec = 0;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         
         // 接收响应
         char buffer[4096];
@@ -66,6 +80,7 @@ void* client_thread(void* arg) {
             buffer[n] = '\0';
             data->successful_requests++;
         } else {
+            printf("Thread %d: recv failed for request %d (n=%d, errno=%d)\n", data->thread_id, i, n, errno);
             data->failed_requests++;
         }
         
@@ -76,10 +91,12 @@ void* client_thread(void* arg) {
                         (end.tv_nsec - start.tv_nsec) / 1e9;
         data->total_time += elapsed;
         
-        // 短暂延迟
-        usleep(10000); // 10ms
+        // 短暂延迟（可选）
+        // usleep(1000); // 1ms
     }
     
+    printf("Thread %d completed: %d successful, %d failed\n", 
+           data->thread_id, data->successful_requests, data->failed_requests);
     return NULL;
 }
 
@@ -108,8 +125,11 @@ int main() {
     }
     
     // 等待所有线程完成
+    printf("Waiting for threads to complete...\n");
     for (int i = 0; i < NUM_THREADS; i++) {
+        printf("Joining thread %d...\n", i);
         pthread_join(threads[i], NULL);
+        printf("Thread %d joined.\n", i);
     }
     
     // 记录结束时间
