@@ -1,5 +1,6 @@
 // thread_pool.c
 #include "thread_pool.h"
+#include "io_thread.h"
 
 // 业务处理函数（示例：简单的 HTTP echo 服务）
 static void process_request(connection_t *conn, void *data, int data_len) {
@@ -18,28 +19,23 @@ static void process_request(connection_t *conn, void *data, int data_len) {
     
     // Echo 收到的数据
     char body[1024];
-    snprintf(body, sizeof(body), "Echo: %.*s", data_len, (char*)data);
+    int body_len = snprintf(body, sizeof(body), "Echo: %.*s", data_len, (char*)data);
     
     response_len = snprintf(response, sizeof(response), 
                            http_response_template, 
-                           (int)strlen(body), body);
+                           body_len, body);
     
     // 将响应数据写入连接的写缓冲区
-    if (response_len < BUFFER_SIZE) {
+    if (response_len > 0 && response_len < BUFFER_SIZE) {
         memcpy(conn->write_buf, response, response_len);
         conn->write_size = response_len;
         conn->write_pos = 0;
         conn->state = CONN_STATE_WRITING;
     }
     
-    // 通知 IO 线程可以写入数据
-    struct epoll_event ev;
-    ev.events = EPOLLOUT | EPOLLET;
-    ev.data.ptr = conn;
-    if (epoll_ctl(conn->epoll_fd, EPOLL_CTL_MOD, conn->fd, &ev) == -1) {
-        log_error("Failed to modify epoll event for fd=%d: %s", conn->fd, strerror(errno));
-    } else {
-        log_info("Response prepared for fd=%d, switching to EPOLLOUT", conn->fd);
+    // 通过消息队列通知IO线程切换到写模式
+    if (conn->io_thread && conn_is_valid(conn)) {
+        io_thread_send_message((io_thread_t*)conn->io_thread, IO_MSG_RESPONSE_READY, conn);
     }
 }
 
@@ -57,16 +53,17 @@ static void* worker_thread(void *arg) {
         // 根据任务类型处理
         switch (task->type) {
             case TASK_TYPE_PROCESS:
-                // 处理业务逻辑
-                log_info("Processing request for fd=%d, data_len=%d", task->conn->fd, task->data_len);
-                process_request(task->conn, task->data, task->data_len);
+                // 检查连接是否仍然有效
+                if (conn_is_valid(task->conn)) {
+                    process_request(task->conn, task->data, task->data_len);
+                }
                 break;
                 
             case TASK_TYPE_CLOSE:
                 // 清理连接
                 if (task->conn) {
-                    close(task->conn->fd);
-                    free(task->conn);
+                    conn_mark_closing(task->conn);
+                    conn_release(task->conn);
                 }
                 break;
                 

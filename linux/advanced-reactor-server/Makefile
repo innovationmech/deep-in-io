@@ -8,7 +8,8 @@ SRCS = main.c \
        io_thread.c \
        thread_pool.c \
        task_queue.c \
-       epoll_wrapper.c
+       epoll_wrapper.c \
+       connection.c
 
 # 目标文件
 OBJS = $(SRCS:.c=.o)

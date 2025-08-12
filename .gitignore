@@ -58,3 +58,6 @@ dist/
 
 # Docker
 .dockerignore
+
+# kiro
+.kiro/

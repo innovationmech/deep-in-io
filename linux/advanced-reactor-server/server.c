@@ -117,7 +117,7 @@ reactor_server_t* server_create(int port, int io_threads, int worker_threads) {
     server->listen_fd = create_listen_socket(port);
     
     // 创建工作线程池
-    server->worker_pool = thread_pool_create(worker_threads, 1000);
+    server->worker_pool = thread_pool_create(worker_threads, 2000);
     if (!server->worker_pool) {
         close(server->listen_fd);
         free(server);
@@ -173,7 +173,7 @@ int server_start(reactor_server_t *server) {
     
     // 主循环：只处理 accept
     while (server->running && !g_shutdown) {
-        int nfds = epoll_wrapper_wait(server->main_epoll, 1000);
+        int nfds = epoll_wrapper_wait(server->main_epoll, 1);
         
         if (nfds == -1) {
             if (errno == EINTR) continue;

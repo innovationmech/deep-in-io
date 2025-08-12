@@ -1,5 +1,6 @@
 // task_queue.c
 #include "task_queue.h"
+#include "common.h"
 
 task_queue_t* task_queue_create(int max_size) {
     task_queue_t *queue = (task_queue_t*)malloc(sizeof(task_queue_t));
@@ -116,6 +117,11 @@ task_t* task_create(task_type_t type, connection_t *conn, void *data, int data_l
     task->conn = conn;
     task->next = NULL;
     
+    // 增加连接引用计数
+    if (conn) {
+        conn_acquire(conn);
+    }
+    
     if (data && data_len > 0) {
         task->data = malloc(data_len);
         if (task->data) {
@@ -135,6 +141,11 @@ task_t* task_create(task_type_t type, connection_t *conn, void *data, int data_l
 
 void task_destroy(task_t *task) {
     if (!task) return;
+    
+    // 释放连接引用
+    if (task->conn) {
+        conn_release(task->conn);
+    }
     
     if (task->data) {
         free(task->data);
