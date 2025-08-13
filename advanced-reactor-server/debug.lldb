@@ -1,0 +1,46 @@
+# LLDB commands for debugging reactor server on macOS
+# Equivalent to debug.gdb but using LLDB syntax
+
+# Set breakpoints at key functions
+breakpoint set --name main
+breakpoint set --name server_create
+breakpoint set --name server_start
+breakpoint set --name accept_connections
+breakpoint set --name io_thread_run
+breakpoint set --name handle_read
+breakpoint set --name handle_write
+breakpoint set --name worker_thread
+
+# Configure display settings
+settings set target.inline-breakpoint-strategy always
+settings set target.use-hex-immediates false
+settings set target.prefer-dynamic-value run-target
+
+# Define custom commands for debugging structures
+command alias print_conn expr -O -T -- *(connection_t*)
+command alias print_server expr -O -T -- *(reactor_server_t*)
+
+# Define useful aliases for quick access
+command alias pstats expr -O -- server->total_connections
+command alias pworker expr -O -- server->worker_pool->tasks_completed
+
+# Set up memory display commands
+command alias hexdump memory read -s1 -f x -c16
+command alias memdump memory read -s4 -f x -c4
+
+# Print helpful information
+echo "LLDB debugging setup complete for reactor server"
+echo "Available custom commands:"
+echo "  print_conn <addr>     - Print connection structure"
+echo "  print_server <addr>   - Print server structure"  
+echo "  pstats                - Print total connections"
+echo "  pworker               - Print worker tasks completed"
+echo "  hexdump <addr>        - Hex dump memory"
+echo "  memdump <addr>        - Memory dump (4-byte words)"
+echo ""
+echo "Usage examples:"
+echo "  run -p 8080 -i 4 -w 8  - Start with arguments"
+echo "  breakpoint list        - List all breakpoints"
+echo "  thread list            - List all threads"
+echo "  bt                     - Show backtrace"
+echo "  frame info             - Show current frame info"

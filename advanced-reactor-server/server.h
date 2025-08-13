@@ -5,7 +5,7 @@
 #include "common.h"
 #include "thread_pool.h"
 #include "io_thread.h"
-#include "epoll_wrapper.h"
+#include "event_loop.h"
 
 typedef struct reactor_server {
     int listen_fd;
@@ -15,8 +15,8 @@ typedef struct reactor_server {
     thread_pool_t *worker_pool;
     io_thread_pool_t *io_pool;
     
-    // 主线程 epoll（只监听 listen_fd）
-    epoll_wrapper_t *main_epoll;
+    // 主线程 event loop（只监听 listen_fd）
+    event_loop_t *main_event_loop;
     
     // 运行状态
     volatile int running;

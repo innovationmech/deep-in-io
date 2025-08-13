@@ -2,12 +2,12 @@
 #include "common.h"
 
 // 创建连接对象
-connection_t* conn_create(int fd, int epoll_fd, struct sockaddr_in *addr, void *io_thread) {
+connection_t* conn_create(int fd, void *event_loop, struct sockaddr_in *addr, void *io_thread) {
     connection_t *conn = (connection_t*)malloc(sizeof(connection_t));
     if (!conn) return NULL;
     
     conn->fd = fd;
-    conn->epoll_fd = epoll_fd;
+    conn->event_loop = event_loop;
     conn->state = CONN_STATE_CONNECTED;
     conn->read_pos = 0;
     conn->write_pos = 0;
@@ -50,7 +50,7 @@ void conn_release(connection_t *conn) {
     pthread_mutex_unlock(&conn->conn_mutex);
     
     if (should_free) {
-        // 确保文件描述符已关闭
+        // 确保文件描述符已关闭 (可能已在 conn_mark_closing 中关闭)
         if (conn->fd >= 0) {
             close(conn->fd);
             conn->fd = -1;
@@ -77,7 +77,14 @@ void conn_mark_closing(connection_t *conn) {
     if (!conn) return;
     
     pthread_mutex_lock(&conn->conn_mutex);
-    conn->closing = 1;
-    conn->state = CONN_STATE_CLOSING;
+    if (!conn->closing) {  // Only mark once
+        conn->closing = 1;
+        conn->state = CONN_STATE_CLOSING;
+        // Close the fd here to prevent further events
+        if (conn->fd >= 0) {
+            close(conn->fd);
+            conn->fd = -1;
+        }
+    }
     pthread_mutex_unlock(&conn->conn_mutex);
 }

@@ -9,13 +9,25 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <signal.h>
 #include <assert.h>
 #include <time.h>
+
+// Platform-specific includes
+#ifdef __linux__
+#include <sys/epoll.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
+#include <sys/types.h>
+#endif
+
+// Include config.h if available
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #define MAX_EVENTS 2048
 #define BUFFER_SIZE 4096
@@ -34,7 +46,7 @@ typedef enum {
 // 连接结构体
 typedef struct connection {
     int fd;
-    int epoll_fd;           // 所属的 epoll 实例
+    void *event_loop;       // 所属的 event loop 实例 (was epoll_fd)
     conn_state_t state;
     char read_buf[BUFFER_SIZE];
     char write_buf[BUFFER_SIZE];
@@ -99,7 +111,7 @@ static inline int set_nonblocking(int fd) {
     fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
 
 // 连接管理函数
-connection_t* conn_create(int fd, int epoll_fd, struct sockaddr_in *addr, void *io_thread);
+connection_t* conn_create(int fd, void *event_loop, struct sockaddr_in *addr, void *io_thread);
 void conn_acquire(connection_t *conn);
 void conn_release(connection_t *conn);
 int conn_is_valid(connection_t *conn);

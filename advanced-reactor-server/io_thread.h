@@ -3,13 +3,13 @@
 #define IO_THREAD_H
 
 #include "common.h"
-#include "epoll_wrapper.h"
+#include "event_loop.h"
 #include "thread_pool.h"
 
 typedef struct io_thread {
     pthread_t thread_id;
     int thread_index;
-    epoll_wrapper_t *epoll;
+    event_loop_t *event_loop;  // Changed from epoll_wrapper_t
     thread_pool_t *worker_pool;
     int pipe_fd[2];        // 用于主线程通知 IO 线程
     int shutdown;
