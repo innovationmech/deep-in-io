@@ -9,7 +9,6 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <sys/socket.h>
-#include <sys/epoll.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -17,9 +16,22 @@
 #include <assert.h>
 #include <time.h>
 
-#define MAX_EVENTS 1024
+// Platform-specific includes
+#ifdef __linux__
+#include <sys/epoll.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
+#include <sys/types.h>
+#endif
+
+// Include config.h if available
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#define MAX_EVENTS 2048
 #define BUFFER_SIZE 4096
-#define BACKLOG 128
+#define BACKLOG 1024
 #define MAX_THREADS 16
 
 // 连接状态
@@ -27,13 +39,14 @@ typedef enum {
     CONN_STATE_CONNECTED,
     CONN_STATE_READING,
     CONN_STATE_WRITING,
-    CONN_STATE_CLOSING
+    CONN_STATE_CLOSING,
+    CONN_STATE_CLOSED
 } conn_state_t;
 
 // 连接结构体
 typedef struct connection {
     int fd;
-    int epoll_fd;           // 所属的 epoll 实例
+    void *event_loop;       // 所属的 event loop 实例 (was epoll_fd)
     conn_state_t state;
     char read_buf[BUFFER_SIZE];
     char write_buf[BUFFER_SIZE];
@@ -43,6 +56,11 @@ typedef struct connection {
     struct sockaddr_in addr;
     time_t last_active;
     void *io_thread;        // 所属的 IO 线程
+    
+    // 线程安全相关
+    pthread_mutex_t conn_mutex;  // 连接互斥锁
+    int ref_count;               // 引用计数
+    int closing;                 // 正在关闭标志
 } connection_t;
 
 // 任务类型
@@ -52,6 +70,19 @@ typedef enum {
     TASK_TYPE_PROCESS,
     TASK_TYPE_CLOSE
 } task_type_t;
+
+// IO线程消息类型
+typedef enum {
+    IO_MSG_RESPONSE_READY,  // 响应准备就绪，需要切换到EPOLLOUT
+    IO_MSG_CLOSE_CONN       // 关闭连接
+} io_msg_type_t;
+
+// IO线程消息结构
+typedef struct io_message {
+    io_msg_type_t type;
+    connection_t *conn;
+    struct io_message *next;
+} io_message_t;
 
 // 任务结构体
 typedef struct task {
@@ -78,5 +109,12 @@ static inline int set_nonblocking(int fd) {
 
 #define log_error(fmt, ...) \
     fprintf(stderr, "[ERROR] " fmt "\n", ##__VA_ARGS__)
+
+// 连接管理函数
+connection_t* conn_create(int fd, void *event_loop, struct sockaddr_in *addr, void *io_thread);
+void conn_acquire(connection_t *conn);
+void conn_release(connection_t *conn);
+int conn_is_valid(connection_t *conn);
+void conn_mark_closing(connection_t *conn);
 
 #endif // COMMON_H

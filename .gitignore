@@ -58,3 +58,9 @@ dist/
 
 # Docker
 .dockerignore
+
+# kiro
+.kiro/
+
+# claude settings
+.claude/

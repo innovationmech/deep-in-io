@@ -15,8 +15,8 @@ static void print_usage(const char *prog) {
 
 int main(int argc, char *argv[]) {
     int port = 8080;
-    int io_threads = 4;
-    int worker_threads = 8;
+    int io_threads = 12;  // 基于测试结果的最优配置
+    int worker_threads = 24;
     
     // 解析命令行参数
     static struct option long_options[] = {

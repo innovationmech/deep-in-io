@@ -1,5 +1,6 @@
 // server.c
 #include "server.h"
+#include "event_loop.h"
 
 // 信号处理
 static volatile int g_shutdown = 0;
@@ -117,7 +118,7 @@ reactor_server_t* server_create(int port, int io_threads, int worker_threads) {
     server->listen_fd = create_listen_socket(port);
     
     // 创建工作线程池
-    server->worker_pool = thread_pool_create(worker_threads, 1000);
+    server->worker_pool = thread_pool_create(worker_threads, 2000);
     if (!server->worker_pool) {
         close(server->listen_fd);
         free(server);
@@ -133,9 +134,9 @@ reactor_server_t* server_create(int port, int io_threads, int worker_threads) {
         return NULL;
     }
     
-    // 创建主线程的 epoll
-    server->main_epoll = epoll_wrapper_create(10);
-    if (!server->main_epoll) {
+    // 创建主线程的 event loop
+    server->main_event_loop = event_loop_create(10);
+    if (!server->main_event_loop) {
         io_thread_pool_destroy(server->io_pool);
         thread_pool_destroy(server->worker_pool);
         close(server->listen_fd);
@@ -143,10 +144,10 @@ reactor_server_t* server_create(int port, int io_threads, int worker_threads) {
         return NULL;
     }
     
-    // 将监听套接字添加到主 epoll
-    if (epoll_wrapper_add(server->main_epoll, server->listen_fd, 
-                         EPOLLIN | EPOLLET, NULL) == -1) {
-        epoll_wrapper_destroy(server->main_epoll);
+    // 将监听套接字添加到主 event loop
+    if (event_loop_add(server->main_event_loop, server->listen_fd, 
+                       EVENT_READ | EVENT_ET, NULL) == -1) {
+        event_loop_destroy(server->main_event_loop);
         io_thread_pool_destroy(server->io_pool);
         thread_pool_destroy(server->worker_pool);
         close(server->listen_fd);
@@ -172,23 +173,24 @@ int server_start(reactor_server_t *server) {
     log_info("Server starting on port %d...", server->port);
     
     // 主循环：只处理 accept
+    event_t events[10];
     while (server->running && !g_shutdown) {
-        int nfds = epoll_wrapper_wait(server->main_epoll, 1000);
+        int nfds = event_loop_wait(server->main_event_loop, events, 10, 1);
         
         if (nfds == -1) {
             if (errno == EINTR) continue;
-            log_error("epoll_wait error: %s", strerror(errno));
+            log_error("event_loop_wait error: %s", strerror(errno));
             break;
         }
         
         for (int i = 0; i < nfds; i++) {
-            struct epoll_event *ev = &server->main_epoll->events[i];
+            event_t *ev = &events[i];
             
-            if (ev->events & EPOLLIN) {
+            if (ev->events & EVENT_READ) {
                 accept_connections(server);
             }
             
-            if (ev->events & (EPOLLERR | EPOLLHUP)) {
+            if (ev->events & (EVENT_ERROR | EVENT_HUP)) {
                 log_error("Error on listen socket");
                 server->running = 0;
                 break;
@@ -215,7 +217,7 @@ void server_destroy(reactor_server_t *server) {
     }
     
     // 销毁各组件
-    epoll_wrapper_destroy(server->main_epoll);
+    event_loop_destroy(server->main_event_loop);
     io_thread_pool_destroy(server->io_pool);
     thread_pool_destroy(server->worker_pool);
     

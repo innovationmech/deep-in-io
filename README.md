@@ -1,112 +1,51 @@
-# Deep-in-IO Server Examples
+# Deep-in-IO
 
-This is a demonstration project showcasing I/O multiplexing technology with cross-platform server examples.
+A collection of high-performance I/O multiplexing server implementations demonstrating various architectural patterns and cross-platform techniques.
 
-## Project Contents
+## Project Structure
 
-This project contains server implementations for different platforms:
-
-### Linux (epoll)
-- **basic_epoll_server.c** - Basic single-threaded epoll server
-- **epoll_multithread_server.c** - Multi-threaded epoll server
-
-### macOS (kqueue)
-- **kqueue_server.c** - kqueue-based server for macOS
-
-## Quick Start
-
-### System Requirements
-
-#### For Linux (epoll)
-- Linux operating system
-- GCC compiler
-- Make build tool
-
-#### For macOS (kqueue)
-- macOS operating system
-- Clang compiler (included with Xcode)
-- Make build tool
-
-### Compilation
-
-#### Linux (epoll servers)
-```bash
-cd linux/epoll
-
-# Compile all servers
-make all
-
-# Or compile individually
-make basic_epoll_server
-make epoll_mt_server
+```
+deep-in-io/
+├── advanced-reactor-server/   # Cross-platform reactor server (Linux & macOS)
+├── linux/
+│   ├── epoll/                 # Basic epoll examples (Linux-specific)
+│   └── reactor-server/        # Simple reactor pattern (Linux-specific)
+└── osx/
+    └── kqueue/                # Simple kqueue example (macOS-specific)
 ```
 
-#### macOS (kqueue server)
-```bash
-cd osx/kqueue
+## Featured Project
 
-# Compile kqueue server
-make all
-# or
-make kqueue_server
-```
+### 🚀 Advanced Reactor Server (Cross-Platform)
 
-### Running
+**Location**: `advanced-reactor-server/`
 
-#### Linux (epoll servers)
-```bash
-cd linux/epoll
-
-# Run basic server
-make run-basic
-# or
-./basic_epoll_server
-
-# Run multi-threaded server
-make run-mt
-# or
-./epoll_mt_server
-```
-
-#### macOS (kqueue server)
-```bash
-cd osx/kqueue
-
-# Run kqueue server
-make run
-# or
-./kqueue_server
-```
-
-All servers will listen for connections on port 8888.
-
-### Testing Connection
-
-Use telnet or other client tools to connect to the server:
+A production-ready, cross-platform reactor server that automatically adapts to the underlying platform:
+- **Linux**: Uses epoll for high-performance I/O multiplexing
+- **macOS**: Uses kqueue for optimal BSD performance
+- **Features**: Multi-threaded reactor pattern, configurable thread pools, HTTP support, cross-platform debugging
+- **Documentation**: See [README-CROSSPLATFORM.md](advanced-reactor-server/README-CROSSPLATFORM.md)
 
 ```bash
-telnet localhost 8888
+cd advanced-reactor-server
+./configure && make
+./reactor_server -p 8080 -i 4 -w 8
 ```
 
-## Cross-Platform Support
+## Educational Examples
 
-- **Linux**: Use epoll-based servers in `linux/epoll/`
-- **macOS**: Use kqueue-based server in `osx/kqueue/`
+### Linux-Specific Implementations
 
-## Other Commands
+- **linux/epoll/**: Fundamental epoll-based servers demonstrating single-threaded and multi-threaded approaches
+- **linux/reactor-server/**: Simple reactor pattern implementation for learning purposes
 
-Each platform directory has its own Makefile with common commands:
+### macOS-Specific Implementation
 
-```bash
-# Clean compiled files
-make clean
+- **osx/kqueue/**: Basic BSD kqueue-based server for macOS systems
 
-# Rebuild
-make rebuild
+## Documentation
 
-# Show help
-make help
-```
+Each sub-project contains its own README with detailed setup instructions, architecture explanations, and usage examples. Please refer to the individual project directories for specific documentation.
 
 ## License
 

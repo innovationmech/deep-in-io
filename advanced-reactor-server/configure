@@ -1,0 +1,163 @@
+#!/bin/bash
+
+# Simple configure script for cross-platform reactor server
+# Detects platform and generates config.h and Makefile.config
+
+echo "Configuring reactor server..."
+
+# Detect OS
+OS=$(uname -s)
+ARCH=$(uname -m)
+
+# Default values
+CC=gcc
+CFLAGS="-Wall -Wextra -O2 -g -pthread"
+LDFLAGS="-pthread"
+PLATFORM_SRCS=""
+PLATFORM_DEFINES=""
+
+echo "Detected OS: $OS"
+echo "Detected Architecture: $ARCH"
+
+# Platform-specific configuration
+case "$OS" in
+    Linux)
+        echo "Configuring for Linux (epoll)"
+        PLATFORM_SRCS="event_loop_epoll.c"
+        PLATFORM_DEFINES="-D__linux__ -DUSE_EPOLL"
+        ;;
+    Darwin)
+        echo "Configuring for macOS (kqueue)"
+        PLATFORM_SRCS="event_loop_kqueue.c"
+        PLATFORM_DEFINES="-D__APPLE__ -DUSE_KQUEUE"
+        # macOS might use clang
+        if command -v clang &> /dev/null; then
+            CC=clang
+        fi
+        ;;
+    FreeBSD|OpenBSD|NetBSD)
+        echo "Configuring for BSD (kqueue)"
+        PLATFORM_SRCS="event_loop_kqueue.c"
+        PLATFORM_DEFINES="-D__BSD__ -DUSE_KQUEUE"
+        ;;
+    *)
+        echo "Error: Unsupported platform: $OS"
+        exit 1
+        ;;
+esac
+
+# Check for required tools
+echo "Checking for required tools..."
+
+check_tool() {
+    if ! command -v $1 &> /dev/null; then
+        echo "Error: $1 not found. Please install $1."
+        exit 1
+    fi
+    echo "  ✓ $1 found"
+}
+
+check_tool $CC
+check_tool make
+
+# Check for debuggers (optional)
+echo "Checking for debugging tools..."
+DEBUGGER=""
+if command -v gdb &> /dev/null; then
+    echo "  ✓ gdb found"
+    DEBUGGER="gdb"
+fi
+
+if command -v lldb &> /dev/null; then
+    echo "  ✓ lldb found"
+    if [ -z "$DEBUGGER" ]; then
+        DEBUGGER="lldb"
+    else
+        DEBUGGER="$DEBUGGER,lldb"
+    fi
+fi
+
+if [ -z "$DEBUGGER" ]; then
+    echo "  ⚠ No debugger found (gdb/lldb). Debugging will not be available."
+    DEBUGGER="none"
+fi
+
+# Generate config.h
+echo "Generating config.h..."
+cat > config.h << EOF
+/* Auto-generated configuration header */
+#ifndef CONFIG_H
+#define CONFIG_H
+
+/* Platform detection */
+#ifdef __linux__
+    #define PLATFORM_LINUX 1
+    #define PLATFORM_NAME "Linux"
+#elif defined(__APPLE__)
+    #define PLATFORM_MACOS 1
+    #define PLATFORM_NAME "macOS"
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    #define PLATFORM_BSD 1
+    #define PLATFORM_NAME "BSD"
+#else
+    #error "Unsupported platform"
+#endif
+
+/* Feature flags */
+#define MAX_IO_THREADS 16
+#define MAX_WORKER_THREADS 32
+#define DEFAULT_IO_THREADS 4
+#define DEFAULT_WORKER_THREADS 8
+#define DEFAULT_PORT 8080
+
+/* Buffer sizes */
+#define BUFFER_SIZE 4096
+#define MAX_EVENTS 2048
+#define BACKLOG 1024
+
+/* Debugging tools */
+EOF
+
+# Add debugger-specific defines
+if echo "$DEBUGGER" | grep -q gdb; then
+    echo '#define HAVE_GDB 1' >> config.h
+fi
+
+if echo "$DEBUGGER" | grep -q lldb; then
+    echo '#define HAVE_LLDB 1' >> config.h
+fi
+
+echo "#define DEBUGGER_AVAILABLE \"$DEBUGGER\"" >> config.h
+echo "" >> config.h
+echo "#endif /* CONFIG_H */" >> config.h
+
+# Generate Makefile.config
+echo "Generating Makefile.config..."
+cat > Makefile.config << EOF
+# Auto-generated Makefile configuration
+# Generated on $(date)
+
+# Platform: $OS ($ARCH)
+PLATFORM = $OS
+ARCH = $ARCH
+
+# Compiler and flags
+CC = $CC
+CFLAGS = $CFLAGS $PLATFORM_DEFINES
+LDFLAGS = $LDFLAGS
+
+# Platform-specific sources
+PLATFORM_SRCS = $PLATFORM_SRCS
+
+# Debugging tools
+DEBUGGER = $DEBUGGER
+EOF
+
+echo ""
+echo "Configuration complete!"
+echo "  Platform: $OS"
+echo "  Compiler: $CC"
+echo "  Platform sources: $PLATFORM_SRCS"
+echo "  Debugger: $DEBUGGER"
+echo ""
+echo "You can now run 'make' to build the reactor server."
